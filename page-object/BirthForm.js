@@ -13,7 +13,7 @@ export class BirthForm{
     }
 
     async fillBirthForm(birth){
-        await this.placeOfBrithInput.fill(birth.placeOfBrith);
+        await this.placeOfBirthInput.fill(birth.placeOfBirth);
         await this.motherInput.fill(birth.mother);
         await this.fatherInput.fill(birth.father);
         await this.grendmamInput.fill(birth.grendmam);
