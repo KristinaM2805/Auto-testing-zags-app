@@ -6,10 +6,12 @@
   "scripts": {
     "test": "playwright test",
     "test:headed": "playwright test --headed",
+    "test:api": "playwright test tests/apiTests.spec.js",
     "allure:clean": "rm -rf allure-results allure-report",
     "allure:generate": "allure generate allure-results --clean -o allure-report",
-    "allure:open": "allure open allure-report --host 127.0.0.1 --port 62051",
-    "test:allure": "npm test && npm run allure:generate && npm run allure:open"
+    "allure:open": "allure open allure-report --host 0.0.0.0 --port 62051",
+    "test:allure": "npm run allure:clean && npm test && npm run allure:generate && npm run allure:open",
+    "test:api:allure": "npm run allure:clean && npm run test:api && npm run allure:generate && npm run allure:open"
   },
   "keywords": [],
   "author": "",
@@ -18,6 +20,8 @@
   "devDependencies": {
     "@playwright/test": "^1.63.0",
     "@types/node": "^26.2.0",
+    "ajv": "^8.17.1",
+    "allure-commandline": "^2.43.0",
     "allure-playwright": "^3.12.0"
   }
 }
