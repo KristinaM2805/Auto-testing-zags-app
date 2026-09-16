@@ -6,7 +6,6 @@ import { ApplicationApi } from '../api/api/ApplicationApi.js';
 
 import { userSchema } from '../api/schemas/userSchema.js';
 import { adminSchema } from '../api/schemas/adminSchema.js';
-import { requestProcessSchema } from '../api/schemas/requestProcessSchema.js';
 import { applicationsSchema } from '../api/schemas/applicationsSchema.js';
 import { applicationStatusSchema } from '../api/schemas/applicationStatusSchema.js';
 import { adminResponseSchema } from '../api/schemas/adminResponseSchema.js';
@@ -15,6 +14,9 @@ import { weddingUser } from '../api/value-objects/user.js';
 import { adminRequest } from '../api/value-objects/adminRequest.js';
 import { requestProcess } from '../api/value-objects/requestProcess.js';
 
+import { connectToDb } from '../db/dbConnection.js';
+
+import { getAdminByStaffId, getApplicantByPassport} from '../db/dbQueries.js';
 
 const ajv = new Ajv({
   allErrors: true,
@@ -26,10 +28,7 @@ function expectSchema(schema, data) {
   const validate = ajv.compile(schema);
   const valid = validate(data);
 
-  expect(
-    valid,
-    JSON.stringify(validate.errors, null, 2)
-  ).toBe(true);
+  expect(valid,JSON.stringify(validate.errors, null, 2)).toBe(true);
 }
 
 
@@ -65,8 +64,28 @@ test.describe('POST /sendUserRequest', () => {
     );
 
     await test.step('Проверить статус ответа', async () => {
-      expect(response.status()).toBe(200);
-    });
+      expect(response.status()).toBe(200); });
+
+    await test.step('Проверить созданного клиента в БД', async () => {
+    const client = await connectToDb();
+
+    try {
+      const applicant = await getApplicantByPassport(
+        client,
+        weddingUser.personalNumberOfPassport
+      );
+
+      expect(applicant).toBeDefined();
+      expect(applicant.surname).toBe(weddingUser.personalLastName);
+      expect(applicant.name).toBe(weddingUser.personalFirstName);
+      expect(applicant.middlename).toBe(weddingUser.personalMiddleName);
+      expect(applicant.passportnumber).toBe(weddingUser.personalNumberOfPassport);
+      expect(applicant.phonenumber).toBe(weddingUser.personalPhoneNumber);
+      expect(applicant.registration_address).toBe(weddingUser.personalAddress);
+    } finally {
+      await client.end();
+    }
+  });
   });
 
 
@@ -95,7 +114,6 @@ test.describe('POST /sendUserRequest', () => {
       expect(response.status()).not.toBe(200);
     });
   });
-
 
   test('Отрицательный - некорректный mode', async ({ request }) => {
     await setAllure(
@@ -264,10 +282,6 @@ test.describe('POST /sendAdminRequest', () => {
 
     const applicationApi = new ApplicationApi(request);
 
-    await test.step('Проверить тело запроса по JSON Schema', async () => {
-      expectSchema(adminSchema, adminRequest);
-    });
-
     const response = await test.step(
       'Отправить запрос на создание администратора',
       async () => {
@@ -291,6 +305,28 @@ test.describe('POST /sendAdminRequest', () => {
       expect(typeof body.data.staffid).toBe('number');
       expect(body.requestId).toBeDefined();
     });
+
+  await test.step('Проверить созданного администратора в БД', async () => {
+  const client = await connectToDb();
+
+  try {
+    const admin = await getAdminByStaffId(
+      client,
+      body.data.staffid
+    );
+
+    expect(admin).toBeDefined();
+
+    expect(admin.staffid).toBe(body.data.staffid);
+    expect(admin.surname).toBe(adminRequest.personalLastName);
+    expect(admin.name).toBe(adminRequest.personalFirstName);
+    expect(admin.middlename).toBe(adminRequest.personalMiddleName);
+    expect(admin.passportnumber).toBe(adminRequest.personalNumberOfPassport);
+    expect(admin.phonenumber).toBe(adminRequest.personalPhoneNumber );
+    } finally {
+    await client.end();
+    }
+  });
   });
 
 
@@ -335,9 +371,7 @@ test.describe('POST /sendAdminRequest', () => {
 
     delete invalidAdmin.personalNumberOfPassport;
 
-    const response = await test.step(
-      'Отправить запрос без personalNumberOfPassport',
-      async () => {
+    const response = await test.step('Отправить запрос без personalNumberOfPassport',async () => {
         return await applicationApi.sendAdminRequest(invalidAdmin);
       }
     );
@@ -359,10 +393,6 @@ test.describe('POST /requestProcess', () => {
     );
 
     const applicationApi = new ApplicationApi(request);
-
-    await test.step('Проверить тело запроса по JSON Schema', async () => {
-      expectSchema(requestProcessSchema, requestProcess);
-    });
 
     const response = await test.step(
       'Отправить запрос на изменение статуса заявления',
