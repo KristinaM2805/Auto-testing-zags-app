@@ -16,7 +16,7 @@ import { deth } from '../value-objects/Deth.js';
 
 test.beforeEach(async ({ page }) => {
   await test.step('Открыть сайт', async () => {
-    await page.goto('https://regoffice.senla.eu/');
+    await page.goto('https://regoffice.senla.eu/',  { waitUntil: 'domcontentloaded' });
   });
 
   await test.step('Войти как пользователь', async () => {

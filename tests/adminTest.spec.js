@@ -7,7 +7,7 @@ import { AdminForm } from '../page-object/AdminForm.js';
 
 test.beforeEach(async ({ page }) => {
   await test.step('Открыть сайт', async () => {
-    await page.goto('https://regoffice.senla.eu/');
+    await page.goto('https://regoffice.senla.eu/', { waitUntil: 'domcontentloaded' });
   });
   await test.step('Войти как администратор', async () => {
     await page.getByRole('button', {name: 'Войти как администратор'}).click();

@@ -1,0 +1,85 @@
+name: Scheduled Playwright Tests
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    - cron: '0 5 * * *'
+      timezone: 'Europe/Minsk'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    env:
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Clean old Allure results
+        run: rm -rf allure-results allure-report
+
+      - name: Run Playwright tests
+        id: playwright
+        continue-on-error: true
+        run: npx playwright test --workers=3
+
+      - name: Generate Allure report
+        if: always()
+        run: npx allure generate allure-results --clean -o allure-report
+
+      - name: Create report archive
+        if: always()
+        run: zip -r allure-report.zip allure-report
+
+      - name: Upload Allure report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report
+          path: allure-report/
+          retention-days: 7
+
+      - name: Send report by email
+        if: always()
+        uses: dawidd6/action-send-mail@v18
+        with:
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: ${{ secrets.MAIL_PORT }}
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+
+          subject: Playwright test report - ${{ github.repository }}
+
+          to: ${{ secrets.MAIL_TO }}
+          from: ${{ secrets.MAIL_USERNAME }}
+
+          body: |
+            Automated Playwright test run completed.
+
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Run number: ${{ github.run_number }}
+
+            The Allure report is attached.
+
+          attachments: allure-report.zip
+
+      - name: Fail workflow if tests failed
+        if: steps.playwright.outcome == 'failure'
+        run: exit 1
