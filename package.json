@@ -5,6 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "playwright test",
+    "test:cucumber": "cucumber-js",
+    "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:api": "playwright test tests/apiTests.spec.js",
     "allure:clean": "rm -rf allure-results allure-report",
@@ -18,6 +20,7 @@
   "license": "ISC",
   "type": "module",
   "devDependencies": {
+    "@cucumber/cucumber": "^13.2.1",
     "@playwright/test": "^1.63.0",
     "@types/node": "^26.2.0",
     "ajv": "^8.17.1",
