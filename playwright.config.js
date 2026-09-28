@@ -34,10 +34,10 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
  use: {
     baseURL: 'https://regoffice.senla.eu/',
-
     httpCredentials: {
-      username: 'user',
-      password: 'senlatest',
+    username: 'user',
+    password: 'senlatest',
+    send: 'always',
     },
 
     trace: 'on-first-retry',
