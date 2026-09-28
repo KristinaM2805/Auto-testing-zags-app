@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
 
   schedule:
-    - cron: '0 5 * * *'
-      timezone: 'Europe/Minsk'
+    # 05:00 по Минску = 02:00 UTC
+    - cron: "0 2 * * *"
 
 jobs:
   test:
-    runs-on:  self-hosted
+    runs-on: self-hosted
 
     env:
       DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
@@ -29,109 +29,71 @@ jobs:
 
       - name: Install Playwright browsers
         run: npx playwright install
-      - name: Clean old Allure results
-        run: rm -rf allure-results allure-report test-report.html
 
       - name: Check site access
         run: |
-          echo "=== HEAD ==="
-          curl -I -u user:senlatest https://regoffice.senla.eu/ || true
-
-          echo "=== BODY ==="
-          curl -u user:senlatest https://regoffice.senla.eu/ -o response.html -s -w "\nHTTP STATUS: %{http_code}\n"
-
-          echo "=== FIRST 50 LINES ==="
-          head -50 response.html || true
-      
-      - name: Check API access
-        run: |
-          curl -u user:senlatest \
-            -i \
-            https://regoffice.senla.eu/getApplications || true
+          echo "Checking application..."
+          curl -I \
+            -u user:senlatest \
+            https://regoffice.senla.eu/
 
       - name: Run Playwright tests
         id: playwright
         continue-on-error: true
         run: npx playwright test --workers=3
 
-      - name: Generate Allure report
-        if: always()
-        run: npx allure generate allure-results --clean -o allure-report
-
-      - name: Prepare HTML report for email
+      - name: Generate single-file Allure report
         if: always()
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import os
+          if [ -d "allure-results" ]; then
+            rm -rf allure-report
+            npx allure generate allure-results --clean -o allure-report --single-file
+            cp allure-report/index.html allure-report.html
+          else
+            echo "allure-results directory does not exist"
+            exit 1
+          fi
 
-          source = Path("allure-report/export/mail.html")
-          html = source.read_text(encoding="utf-8")
-
-          run_url = (
-              f"{os.environ['GITHUB_SERVER_URL']}/"
-              f"{os.environ['GITHUB_REPOSITORY']}/actions/runs/"
-              f"{os.environ['GITHUB_RUN_ID']}"
-          )
-
-          block = f'''
-          <div style="margin:24px 0;padding:18px;border:1px solid #ddd;border-radius:8px;font-family:Arial,sans-serif;">
-            <h2 style="margin:0 0 10px 0;">Full Allure report</h2>
-            <p style="margin:0 0 12px 0;">
-              The complete Allure report is stored in GitHub Actions as the
-              <strong>allure-report</strong> artifact.
-            </p>
-            <p style="margin:0;">
-              <a href="{run_url}" style="font-size:16px;font-weight:bold;">
-                Open the full report in GitHub Actions
-              </a>
-            </p>
-          </div>
-          '''
-
-          if "</body>" in html:
-              html = html.replace("</body>", block + "\n</body>")
-          else:
-              html += block
-
-          Path("test-report.html").write_text(html, encoding="utf-8")
-          PY
-
-      - name: Upload full Allure report
+      - name: Upload Allure report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: allure-report
-          path: allure-report/
-          retention-days: 7
+          path: allure-report.html
+          if-no-files-found: warn
+          retention-days: 30
 
-      - name: Send report by email
+      - name: Send Allure report by email
         if: always()
         uses: dawidd6/action-send-mail@v18
         with:
           server_address: ${{ secrets.MAIL_SERVER }}
           server_port: ${{ secrets.MAIL_PORT }}
-          secure: true
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
 
-          subject: Playwright tests - ${{ job.status }} - ${{ github.repository }}
+          subject: "Playwright tests - ${{ steps.playwright.outcome }}"
 
           to: ${{ secrets.MAIL_TO }}
           from: ${{ secrets.MAIL_USERNAME }}
 
           body: |
-            Automated Playwright test run completed.
+            Автоматические Playwright тесты завершены.
 
-            Repository: ${{ github.repository }}
-            Branch: ${{ github.ref_name }}
-            Run number: ${{ github.run_number }}
+            Результат: ${{ steps.playwright.outcome }}
 
-            A short HTML report is attached.
-            The same HTML report contains a link to the full Allure report stored in GitHub Actions.
+            Полный Allure отчет находится во вложении.
 
-          attachments: test-report.html
+            Repository:
+            ${{ github.repository }}
+
+            Run:
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          attachments: allure-report.html
 
       - name: Fail workflow if tests failed
-        if: steps.playwright.outcome == 'failure'
-        run: exit 1
+        if: always() && steps.playwright.outcome == 'failure'
+        run: |
+          echo "Playwright tests failed"
+          exit 1
