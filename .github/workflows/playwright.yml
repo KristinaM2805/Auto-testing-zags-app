@@ -33,6 +33,23 @@ jobs:
       - name: Clean old Allure results
         run: rm -rf allure-results allure-report test-report.html
 
+      - name: Check site access
+        run: |
+          echo "=== HEAD ==="
+          curl -I -u user:senlatest https://regoffice.senla.eu/ || true
+
+          echo "=== BODY ==="
+          curl -u user:senlatest https://regoffice.senla.eu/ -o response.html -s -w "\nHTTP STATUS: %{http_code}\n"
+
+          echo "=== FIRST 50 LINES ==="
+          head -50 response.html || true
+      
+      - name: Check API access
+        run: |
+          curl -u user:senlatest \
+            -i \
+            https://regoffice.senla.eu/getApplications || true
+
       - name: Run Playwright tests
         id: playwright
         continue-on-error: true
