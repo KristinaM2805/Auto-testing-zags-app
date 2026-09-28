@@ -28,8 +28,7 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps
-
+        run: npx playwright install
       - name: Clean old Allure results
         run: rm -rf allure-results allure-report test-report.html
 
